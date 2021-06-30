@@ -1,4 +1,10 @@
 <?php
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'workshop');
+define('DB_USER', 'root');
+define('DB_PASSWORD', 'root');
+define('DB_PORT', '3306');
+
 // エラー情報を表示する
 // https://www.php.net/manual/ja/errorfunc.configuration.php#ini.error-reporting
 ini_set('display_errors', "On");
@@ -7,9 +13,29 @@ ini_set('display_errors', "On");
 // https://www.php.net/manual/ja/function.error-reporting.php
 error_reporting(E_ERROR | E_WARNING | E_PARSE);
 
+// 文字化け対策
+$options = array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET CHARACTER SET 'utf8'");
+
+// PHPのエラーを表示するように設定
+error_reporting(E_ALL & ~E_NOTICE);
+
+// データベースの接続
+try {
+  $dbh = new PDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME, DB_USER, DB_PASSWORD, $options);
+  $dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+  echo $e->getMessage();
+  exit;
+}
+
 //エラーを格納する配列
 $errors = [];
 
+/**
+ * 実行結果を保持する。
+ * 未完了: false
+ * 完了: true
+ */
 $result = false;
 
 //POSTデータは$data変数に入れる
@@ -33,7 +59,12 @@ if(!empty($_POST)) {
         $errors['password'] = 'パスワードを入力してください。';
     }
     if(empty($errors)) {
-        $result = true;
+      $stmt = $dbh->prepare("INSERT INTO users(user_name, email, password) VALUES (?,?,?)");
+      $stmt->bindParam(1, $data['user_name'], PDO::PARAM_STR);
+      $stmt->bindParam(2, $data['email'], PDO::PARAM_STR);
+      $stmt->bindParam(3, password_hash($data['password'], PASSWORD_DEFAULT), PDO::PARAM_STR);
+      $stmt->execute();
+      $result = true;
     }
 }
 ?>
@@ -54,8 +85,9 @@ if(!empty($_POST)) {
 
     <?php if($result): ?>
         <p class="success">処理が完了しました。</p>
+        <p class="success"><a href="./show.php">ユーザー一覧ページへ</a></p>
     <?php else: ?>
-<div class="bg-example">
+    <div class="bg-example">
       <form action="./index.php" method="post">
         <div class="form-group">
           <label for="exampleInputName">名前</label>
@@ -69,6 +101,7 @@ if(!empty($_POST)) {
             class="<?php echo !empty($errors['user_name'])? 'error' : 'ok'?>"
             value="<?php echo $data['user_name'] ?>"
           >
+          <p class="error" style="color:red"><?php echo $errors['user_name']?></p>
         </div>
         <div class="form-group">
           <label for="exampleInputEmail">メールアドレス</label>
@@ -80,6 +113,7 @@ if(!empty($_POST)) {
             class="<?php echo !empty($errors['email'])? 'error' : 'ok'?>"
             value="<?php echo $data['email'] ?>"
           >
+          <p class="error" style="color:red"><?php echo $errors['email']?></p>
         </div>
         <div class="form-group">
           <label for="exampleInputPassword">パスワード</label>
@@ -91,10 +125,13 @@ if(!empty($_POST)) {
             class="<?php echo !empty($errors['password'])? 'error' : 'ok'?>"
             value="<?php echo $data['password'] ?>"
           >
+          <p class="error" style="color:red"><?php echo $errors['password']?></p>
         </div>
         <button type="submit">登録</button>
       </form>
     </div>
+
     <?php endif ?>
 </body>
+
 </html>
